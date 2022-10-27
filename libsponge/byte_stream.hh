@@ -22,8 +22,8 @@ class ByteStream {
     bool _error{};  //!< Flag indicating that the stream suffered an error.
     bool _input_ended_flag = false;
 
-    int write_num = 0;
-    int read_num = 0;
+    size_t write_num = 0;
+    size_t read_num = 0;
   public:
     //! Construct a stream with room for `capacity` bytes.
     ByteStream(const size_t capacity);
