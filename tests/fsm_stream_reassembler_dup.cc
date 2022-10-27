@@ -59,7 +59,7 @@ int main() {
             test.execute(NotAtEof{});
             string data = "abcdefgh";
 
-            for (size_t i = 0; i < 1000; ++i) {
+            for (size_t i = 0; i < 10000; ++i) {
                 size_t start_i = uniform_int_distribution<size_t>{0, 8}(rd);
                 auto start = data.begin();
                 std::advance(start, start_i);

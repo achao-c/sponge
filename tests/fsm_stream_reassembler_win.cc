@@ -24,6 +24,17 @@ string read(StreamReassembler &reassembler) {
 
 int main() {
     try {
+        cout << 1;
+        StreamReassembler buf{65000};
+        buf.push_substring("012", 0, 0);
+        cout << buf.stream_out().bytes_written() << endl;
+
+    } catch (const exception &e) {
+        cerr << "Exception: " << e.what() << endl;
+        return EXIT_FAILURE;
+    }
+
+    try {
         auto rd = get_random_generator();
 
         // overlapping segments
@@ -49,7 +60,7 @@ int main() {
                 buf.push_substring(move(dd), off, off + sz == offset);
                 cout << buf.stream_out().bytes_written() << endl;
                 cout<< "----------------" << endl;
-                buf.show_map();
+                //buf.show_map();
                 cout << "---------end" << endl;
             }
             

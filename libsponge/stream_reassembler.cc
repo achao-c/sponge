@@ -14,108 +14,103 @@ void DUMMY_CODE(Targs &&... /* unused */) {}
 using namespace std;
 
 StreamReassembler::StreamReassembler(const size_t capacity) : _output(capacity), _capacity(capacity), 
-_next_assemble_idx(0), _unassemble_strs(), _unassemble_bytes_num(0), _eof_idx(-1) {}
+_next_assemble_idx(0), _unassemble_strs(), _unassemble_bytes_num(0), _eof_idx(-1) {
+
+}
 
 //! \details This function accepts a substring (aka a segment) of bytes,
 //! possibly out-of-order, from the logical stream, and assembles any newly
 //! contiguous substrings and writes them into the output stream in order.
-void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
-    
+void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof)
+ {
+    // 思路就是57. 插入区间的思路，将已有区间分为三块，然后将待插入区间不断与中间重叠区间合并。
     if (eof) _eof_idx = index + data.size();
-
-    /* --1.字符串开头位置处理 */
-    auto pos_iter = _unassemble_strs.upper_bound(index); // 获取map中第一个比index大的下标
-    if (pos_iter != _unassemble_strs.begin()) --pos_iter; // 此时有三种情况：获取map小于等于index的下标；map为空或者map均为大于index的下标。
-
-    size_t new_idx = index;
-    // 1.如果前面有待排列字串
-    if (pos_iter != _unassemble_strs.end() && pos_iter->first <= index) {
-        const size_t up_idx = pos_iter->first;
-        // 如果当前字符串与上一个发生了重叠
-        if (up_idx + pos_iter->second.size() > index) {
-            // 如果上一个字符串将当前串包含了
-            if (up_idx + pos_iter->second.size() >= index + data.size()) return;
-            new_idx = up_idx + pos_iter->second.size();
-        }
-    }
-    // 2.前面没有字串，需要比较与待处理字符下标的关系
-    else {
-        if (index + data.size() <= _next_assemble_idx) {
-            if (_eof_idx <= _next_assemble_idx) _output.end_input();
-            return;
-        }
-        if (index < _next_assemble_idx) new_idx = _next_assemble_idx;
-    }
-
-    // 3.若起始位置超过容量了，就舍去
-    size_t first_unacceptable_idx = _next_assemble_idx - _output.buffer_size() + _capacity;
-    if (new_idx >= first_unacceptable_idx) return;
-
-    // 新字符串的长度，略微与答案不同
-    // 如果当前字符串被已存在字符串包含，在上面逻辑已经处理。
-    size_t data_size = data.size()-(new_idx-index); 
     
-
-    /* --2.处理字符串结尾的位置 */
-    pos_iter = _unassemble_strs.lower_bound(new_idx);  // 此时可能新起始位置与down_idx重合
-    
-    // 1. 若后面有未排序的字符串，要考虑重合的情况
-    while (pos_iter != _unassemble_strs.end() && new_idx <= pos_iter->first) {
-        // 1.无接触
-        if (new_idx + data_size <= pos_iter->first) break;
-        // 2.有接触
-        else {
-            // 部分接触
-            if (new_idx + data_size <= pos_iter->first + pos_iter->second.size()) {
-                data_size = pos_iter->first - new_idx;
-                break;
-            }
-            // 完全包含下一个字符串
-            else {
-                _unassemble_bytes_num -= pos_iter->second.size(); // 未排序字符个数减去删除的序列长度
-                pos_iter = _unassemble_strs.erase(pos_iter); // erase函数内可以是key也可以是迭代器，只有迭代器才会返回下一个迭代器
-            }
-        } 
-    } 
-    // 2.跟起始位置统一逻辑，若超出容量限制，就保存至最大容量的长度
-    if (new_idx + data_size > first_unacceptable_idx) data_size = 
-    data_size - (new_idx + data_size - first_unacceptable_idx);
-
-    // 这一步是关键，若新的截断字串长度为0，则必须防止它将已有的key覆盖
-    if (!data_size) {
+    size_t start = index;
+    if (!data.size()) {
         if (_eof_idx <= _next_assemble_idx) _output.end_input();
         return;
     }
-    /* --3.获取到新的字串及下标后，进行插入*/
-    string new_data = data.substr(new_idx - index, data_size);
-    // 将新字符串插入map中
-    _unassemble_strs[new_idx] = new_data;
-    _unassemble_bytes_num += new_data.size();
+    size_t end = index+data.size()-1;  // 容易引起溢出！！！！！！无符号数-1，所以要在前面判断
+    // 1.首先验证其是否超过两端
+    if (start < _next_assemble_idx) start = _next_assemble_idx;
+    size_t first_unacceptable_idx = _next_assemble_idx - _output.buffer_size() + _capacity;
+    if (end >= first_unacceptable_idx) end = first_unacceptable_idx-1;
+    if (start > end) {
+        if (_eof_idx <= _next_assemble_idx) _output.end_input();
+        return;
+    }
+    string ist_data = data.substr(start-index, end-start+1);
+    // 2.首先找出已存在未排序的字符串（其起始位置大于待插入字符串的结束）
+    // 该字符串一定不与新字符串重合
+    auto iter = _unassemble_strs.upper_bound(end);
+    // 2.1/2 下面两种情况说明没有重合，不需要改变
+    if (_unassemble_strs.empty()) {}
+    else if (iter == _unassemble_strs.begin()) {}
+    // 2.3 一直向前与未排序字符串比较，直到找到与前面字符串不重合或者遍历完
+    else {
+        --iter;  // 前一个判断与新字符串是否相交
+        // set由于迭代器只是双向迭代器，因此需要在begin()停下，但是该处也有可能重合，所以需要加上一种特殊情况
+        // 因为迭代器没有>=操作符
+        while ((iter != _unassemble_strs.begin() && iter->second.first >= start) 
+        || (iter == _unassemble_strs.begin() && iter->second.first >= start)) {
+            // 新字符串与set中已有的进行组合
+            if (start > iter->first) {
+                size_t lgt = start-iter->first;
+                ist_data = iter->second.second.substr(0, lgt) + ist_data;
+                start = iter->first;
+            }
+            if (end < iter->second.first) {
+                size_t lgt = iter->second.first-end;
+                ist_data += iter->second.second.substr(iter->second.second.size()-lgt);
+                end = iter->second.first;
+            }
+            // 删除set中与新字符串重叠的字符串，需要区分是否是set第一个字符串的两种情况
+            auto _iter = iter;
+            if (iter != _unassemble_strs.begin()) {
+                --iter;
+                _unassemble_bytes_num -= _iter->second.second.size();
+                _unassemble_strs.erase(_iter);
+            }
+            else {
+                _unassemble_bytes_num -= _iter->second.second.size();
+                _unassemble_strs.erase(_iter);
+                break;
+            }
+        }
 
-    // 遍历map字符串，使得可以添加到bytestream的map中的字符串进入
-    for (auto iter = _unassemble_strs.begin(); iter != _unassemble_strs.end(); ) {
+    } 
+    
+    // 3.添加到字典中
+    _unassemble_strs[start] = {end, ist_data};
+    _unassemble_bytes_num += end-start+1;
+    // 4.遍历字典，添加到流中
+    for (auto _iter = _unassemble_strs.begin(); _iter != _unassemble_strs.end(); ) {
         //assert(iter->first >= _next_assemble_idx);
-        if (iter->first == _next_assemble_idx) {
-            size_t write_num = _output.write(iter->second);
+        if (_iter->first == _next_assemble_idx) {
+            size_t write_num = _output.write(_iter->second.second);
             _next_assemble_idx += write_num;
             // 若此时流内满了
-            if (write_num < iter->second.size()) {
-                _unassemble_bytes_num += iter->second.size()-write_num;
-                _unassemble_strs[_next_assemble_idx] = iter->second;
+            if (write_num < _iter->second.second.size()) {
+                _unassemble_bytes_num += _iter->second.second.size()-write_num;
+                _unassemble_strs[_next_assemble_idx] = 
+                {end, _iter->second.second.substr(write_num)};
 
-                _unassemble_bytes_num -= iter->second.size();
-                _unassemble_strs.erase(iter);
+                _unassemble_bytes_num -= _iter->second.second.size();
+                _unassemble_strs.erase(_iter);
                 break;
             }
             else {
-                _unassemble_bytes_num -= iter->second.size();
-                iter = _unassemble_strs.erase(iter);
+                _unassemble_bytes_num -= _iter->second.second.size();
+                _iter = _unassemble_strs.erase(_iter);
             }
         }
         else break;
     }
+    
+    if (_eof_idx <= _next_assemble_idx) _output.end_input();
 
-    if (_eof_idx <= _next_assemble_idx) {std::cout << _eof_idx; _output.end_input();}
+
 
 
 }
@@ -124,6 +119,6 @@ size_t StreamReassembler::unassembled_bytes() const { return _unassemble_bytes_n
 
 bool StreamReassembler::empty() const { return _unassemble_bytes_num == 0; }
 
-size_t StreamReassembler::show_map() { 
-    for (auto iter = _unassemble_strs.begin(); iter != _unassemble_strs.end(); ++iter) cout << iter->first << ' ' << iter->second.size() << endl;
-    return 0; }
+//size_t StreamReassembler::show_map() { 
+ //   for (auto iter = _unassemble_strs.begin(); iter != _unassemble_strs.end(); ++iter) cout << iter->first << ' ' << iter->second.size() << endl;
+  //  return 0; }

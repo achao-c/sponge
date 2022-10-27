@@ -17,7 +17,7 @@ class StreamReassembler {
     size_t _capacity;    //!< The maximum number of bytes
 
     size_t _next_assemble_idx;  // 下一个待组装的下标
-    std::map<size_t, std::string> _unassemble_strs;  // 储存待排序的字符串
+    std::map<size_t, std::pair<size_t, std::string>> _unassemble_strs;  // 储存待排序的字符串
 
     size_t _unassemble_bytes_num;
     size_t _eof_idx;
@@ -53,7 +53,7 @@ class StreamReassembler {
     //! \returns `true` if no substrings are waiting to be assembled
     bool empty() const;
 
-    size_t show_map();
+    //size_t show_map();
 };
 
 #endif  // SPONGE_LIBSPONGE_STREAM_REASSEMBLER_HH

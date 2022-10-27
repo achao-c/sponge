@@ -12,7 +12,6 @@ int main() {
     try {
         {
             ReassemblerTestHarness test{65000};
-
             test.execute(BytesAssembled(0));
             test.execute(BytesAvailable(""));
             test.execute(NotAtEof{});
