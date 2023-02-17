@@ -67,7 +67,7 @@ size_t ByteStream::buffer_size() const { return buffer.size(); }
 
 bool ByteStream::buffer_empty() const { return buffer.empty(); }
 
-bool ByteStream::eof() const { return buffer_empty() && is_end; }
+bool ByteStream::eof() const { return buffer_empty() && is_end; }  // 读端要看写端是否终止及buffer是否为空
 
 size_t ByteStream::bytes_written() const { return totol_write; }
 
